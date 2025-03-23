@@ -188,7 +188,147 @@ const login = async (req, res) => {
     }
 };
 
+const  getProfile = async (req, res) => {
+    //get user from cookie
+    try{
+        const data = req.user;
+        const user =await User.findOne({ _id: req.user.id }).select("-password");
+        if(!user){
+            return res.status(400).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+        res.status(200).json({
+            success: true,
+            user
+        });
+        console.log("reached at porfile level", data);
+
+    }catch(error){
+        console.error("Error getting user profile:", error);
+        return res.status(500).json({
+            message: "Internal server error",
+            success: false,
+            error: error.message || error
+        });
+    }
+};
 
 
+const updateProfile = async (req, res) => {
+    //check if user is logged in
+    //extract the values to be updated from the request body
+    //fetch user from database
+    //save the user
+    try{
+        const data = req.user;
+        console.log("req.user:", req.user);
+        console.log("Update body:", req.body);
+        
+        const user = await User.findOne({ _id: req.user.id });
 
-export { registeredUser ,verifyUser, login};
+        if(!user){
+            return res.status(400).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+        //update user
+        user.name = req.body.name || user.name;
+        user.email = req.body.email || user.email;
+        user.role = req.body.role || user.role;
+
+        await user.save();
+        return res.status(200).json({
+            success: true,
+            message: "User updated successfully",
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role
+            }
+        });
+        
+    }catch(error){
+        return res.status(500).json({
+            message: "Internal server error",
+            success: false,
+            error: error.message || error
+        });
+    }
+};
+
+const forgotPassword = async (req, res) => {
+    //get email
+    //find user based on email
+    //reset token + reste expiry 
+    //save user
+    //send mail
+};
+
+const resetPassword = async (req, res) => {
+    try{
+        //collect token from params
+        //password from req.body
+        //find user based on token
+
+        const {token} = req.params;
+        const {password} = req.body;
+
+        try {
+            const user = await User.findOne(
+                { resetPasswordToken: token,
+                  resetPasswordExpire: { $gt: Date.now() } 
+            });
+            //set password in user
+            user.password = password;
+            //resetToken , resetExpiry 
+            user.resetPasswordToken = '';
+            user.resetPasswordExpire = '';
+            //save user
+            await user.save();
+        }catch(error){
+            return res.status(400).json({
+                message: "Invalid token",
+            });
+        }
+    }catch(error){
+        return res.status(500).json({
+            message: "Internal server error",
+            success: false,
+            error: error.message || error
+        });
+    }
+};
+
+const logout = async (req, res) => {
+    //clear cookie
+    try{
+        res.cookie("token", "none", {
+            expires: new Date(0),
+            httpOnly: true
+        });
+        res.status(200).json({
+            success: true,
+            message: "User logged out successfully"
+        });
+    }catch(error){
+        return res.status(500).json({
+            message: "Internal server error",
+            success: false,
+            error: error.message || error
+        });
+    }
+};
+
+export { registeredUser,
+    verifyUser,
+    login,
+    getProfile,
+    updateProfile,
+    forgotPassword,
+    resetPassword, 
+    logout
+};
