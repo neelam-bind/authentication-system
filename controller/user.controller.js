@@ -286,7 +286,7 @@ const forgotPassword = async (req, res) => {
         await user.save();
 
         //send mail
-        const resetUrl = `${process.env.BASE_URL}/resetPassword/${resetToken}`;
+        const resetUrl = `${process.env.BASE_URL}/api/v1/users/resetPassword/${resetToken}`;
         const transporter = nodemailer.createTransport({
             host: process.env.MAILTRAP_HOST,
             port: process.env.MAILTRAP_PORT,
@@ -324,28 +324,31 @@ const forgotPassword = async (req, res) => {
 const resetPassword = async (req, res) => {
     try {
         // Extract token from URL params & new password from body
-        const { token } = req.params;
+        const { resetToken } = req.params;
         const { password } = req.body;
 
         // Find user by token & check if token is still valid
         const user = await User.findOne({
-            resetPasswordToken: token,
+            resetPasswordToken: resetToken,
             resetPasswordExpire: { $gt: Date.now() } // Ensure token hasn't expired
         });
 
         // If user not found, return error
         if (!user) {
-            return res.status(400).json({ success: false, message: "Invalid or expired token" });
+            return res.status(400).json({ 
+                success: false,
+                message: "Invalid or expired token" 
+            });
         }
 
-        // Set new password (your middleware will hash it)
+        // Set new password 
         user.password = password;
 
         // Clear the reset token and expiry
         user.resetPasswordToken = undefined;
         user.resetPasswordExpire = undefined;
 
-        // Save the updated user (middleware will hash password automatically)
+        // Save the updated user
         await user.save();
 
         // Send success response
