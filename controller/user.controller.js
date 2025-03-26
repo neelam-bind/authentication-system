@@ -260,48 +260,112 @@ const updateProfile = async (req, res) => {
     }
 };
 
+
+//forgetpassword
 const forgotPassword = async (req, res) => {
     //get email
     //find user based on email
     //reset token + reste expiry 
     //save user
     //send mail
-};
-
-const resetPassword = async (req, res) => {
     try{
-        //collect token from params
-        //password from req.body
-        //find user based on token
-
-        const {token} = req.params;
-        const {password} = req.body;
-
-        try {
-            const user = await User.findOne(
-                { resetPasswordToken: token,
-                  resetPasswordExpire: { $gt: Date.now() } 
-            });
-            //set password in user
-            user.password = password;
-            //resetToken , resetExpiry 
-            user.resetPasswordToken = '';
-            user.resetPasswordExpire = '';
-            //save user
-            await user.save();
-        }catch(error){
+        const { email } = req.body;
+        const user = await User.findOne({ email });
+        if(!user){
             return res.status(400).json({
-                message: "Invalid token",
+                success: false,
+                message: "User not found"
             });
         }
+        //generate reset token
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        user.resetPasswordToken = resetToken;
+        user.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
+        
+        //save the user
+        await user.save();
+
+        //send mail
+        const resetUrl = `${process.env.BASE_URL}/api/v1/users/resetPassword/${resetToken}`;
+        const transporter = nodemailer.createTransport({
+            host: process.env.MAILTRAP_HOST,
+            port: process.env.MAILTRAP_PORT,
+            auth: {
+                user: process.env.MAILTRAP_USER,
+                pass: process.env.MAILTRAP_PASS
+            }
+        });
+        
+        const mailOptions = {
+            from: 'authentication_sys@gmail.com',
+            to: user.email,
+            subject: 'Password Reset',
+            text: `Please click on the link to reset your password: ${resetUrl}`
+        };
+        // Send email
+        await transporter.sendMail(mailOptions);
+
+        return res.status(200).json({
+            success: true,
+            message: "Password reset email sent successfully"
+        });
+
     }catch(error){
         return res.status(500).json({
             message: "Internal server error",
             success: false,
             error: error.message || error
+            });
+    };
+};
+
+
+//resetpassword
+const resetPassword = async (req, res) => {
+    try {
+        // Extract token from URL params & new password from body
+        const { resetToken } = req.params;
+        const { password } = req.body;
+
+        // Find user by token & check if token is still valid
+        const user = await User.findOne({
+            resetPasswordToken: resetToken,
+            resetPasswordExpire: { $gt: Date.now() } // Ensure token hasn't expired
+        });
+
+        // If user not found, return error
+        if (!user) {
+            return res.status(400).json({ 
+                success: false,
+                message: "Invalid or expired token" 
+            });
+        }
+
+        // Set new password 
+        user.password = password;
+
+        // Clear the reset token and expiry
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpire = undefined;
+
+        // Save the updated user
+        await user.save();
+
+        // Send success response
+        return res.status(200).json({
+            success: true,
+            message: "Password reset successfully. You can now log in with your new password."
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: error.message || error
         });
     }
 };
+
 
 const logout = async (req, res) => {
     //clear cookie
